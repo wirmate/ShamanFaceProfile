@@ -201,7 +201,7 @@ namespace SmartBotProfiles
 
         public Card.Cards SirFinleyChoice(List<Card.Cards> choices)
         {
-            var filteredTable = _heroPowersPriotityTable.Where(x => choices.Contains(x.Key)).ToList();
+            var filteredTable = _heroPowersPriorityTable.Where(x => choices.Contains(x.Key)).ToList();
             return filteredTable.First(x => x.Value == filteredTable.Max(y => y.Value)).Key;
         }
 
