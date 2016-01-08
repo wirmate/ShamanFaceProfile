@@ -31,6 +31,8 @@ namespace SmartBotProfiles
     public class ShamanFace : Profile
     {
         //Cards definitions
+        private const Card.Cards TheCoin = Card.Cards.GAME_005;
+
         private const Card.Cards EarthShock = Card.Cards.EX1_245;
         private const Card.Cards LightningBolt = Card.Cards.EX1_238;
         private const Card.Cards RockbiterWeapon = Card.Cards.CS2_045;
@@ -51,7 +53,7 @@ namespace SmartBotProfiles
         private const Card.Cards IronbeakOwl = Card.Cards.CS2_203;
         private const Card.Cards UnboundElemental = Card.Cards.EX1_258;
         private const Card.Cards ArcaneGolem = Card.Cards.EX1_089;
-
+        private const Card.Cards KnifeJuggler = Card.Cards.NEW1_019;
         private const Card.Cards SludgeBelcher = Card.Cards.FP1_012;
 
         private const Card.Cards SteadyShot = Card.Cards.DS1h_292;
@@ -111,15 +113,20 @@ namespace SmartBotProfiles
             //300% of default "Rush" profile value -> the bot will be more aggressive
             parameters.GlobalAggroModifier.Value = AggroModifier;
 
-            //Set FeralSpirit spell modifier to 60% of the base spell value defined in "Rush" profile, the AI has more chances to play this spell
-            parameters.SpellsModifiers.AddOrUpdate(FeralSpirit, new Modifier(60));
+            //Set FeralSpirit spell modifier to 20% of the base spell value defined in "Rush" profile, the AI has more chances to play this spell
+            parameters.SpellsModifiers.AddOrUpdate(FeralSpirit, new Modifier(20));
 
             //Set lava shock spell modifier to 200% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand without any overloaded mana
             parameters.SpellsModifiers.AddOrUpdate(LaveShock, new Modifier(200));
 
+            //Lower TheCoin modifier
+            parameters.SpellsModifiers.AddOrUpdate(TheCoin, new Modifier(70));
+
             //Lower earthshock modifier on Sludge belcher
             parameters.SpellsModifiers.AddOrUpdate(EarthShock, new Modifier(20, SludgeBelcher));
 
+            //Set KnifeJuggler modifier to 30% of the base value defined in "Rush" profile, the AI has more chances to play it
+            parameters.MinionsModifiers.AddOrUpdate(KnifeJuggler, new Modifier(0));
 
             //If we cant put down enemy's life at topdeck lethal range
             if (!HasPotentialLethalNextTurn(board))
@@ -165,9 +172,7 @@ namespace SmartBotProfiles
             }
             else
             {
-                //Set AncestralKnowledge spell modifier to 200% of the base spell value defined in "Rush" profile, the bot will play the spell more easily
-                parameters.SpellsModifiers.AddOrUpdate(AncestralKnowledge, new Modifier(200));
-                parameters.GlobalDrawModifier = new Modifier(20);
+                parameters.GlobalDrawModifier = new Modifier(50);
             }
 
             //Turn specific handlers
