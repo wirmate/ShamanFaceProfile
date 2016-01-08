@@ -68,7 +68,7 @@ namespace SmartBotProfiles
         private const int AggroModifier = 300;
         private const int OverloadSpellsConservativeModifier = 400;
 
-        private readonly Dictionary<Card.Cards, int> _heroPowersPriotityTable = new Dictionary<Card.Cards, int>
+        private readonly Dictionary<Card.Cards, int> _heroPowersPriorityTable = new Dictionary<Card.Cards, int>
         {
             {SteadyShot, 8},
             {Shapeshift, 7},
@@ -133,7 +133,7 @@ namespace SmartBotProfiles
             {
                 //Set lightning bolt spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
                 parameters.SpellsModifiers.AddOrUpdate(LightningBolt,
-                    new Modifier(GetOverloadSpellConservativeModifier(board)));
+                    new Modifier(GetOverloadSpellConservativeModifier(board) / 3));
 
                 //Set crackle spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
                 parameters.SpellsModifiers.AddOrUpdate(Crackle,
@@ -209,6 +209,9 @@ namespace SmartBotProfiles
         {
             //Set TunnelTrogg modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
             parameters.MinionsModifiers.AddOrUpdate(TunnelTrogg, new Modifier(-100));
+			
+			 //Set LeperGnome modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
+            parameters.MinionsModifiers.AddOrUpdate(LeperGnome, new Modifier(-100));
         }
 
         private void HandleTurnTwoSpecifics(Board board, ref ProfileParameters parameters)
@@ -333,7 +336,7 @@ namespace SmartBotProfiles
         private int GetRemainingBlastDamagesAfterSequence(Board board)
         {
             return GetTotalBlastDamagesInHand(board) -
-                   GetPlayableSpellSequenceDamages(board);
+                   GetPlayableSpellSequenceDamages(board, ShouldPlayDoomhammer(board));
         }
 
         private int GetTotalBlastDamagesInHand(Board board)
