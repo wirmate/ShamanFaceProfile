@@ -124,11 +124,11 @@ namespace SmartBotProfiles
             //If we cant put down enemy's life at topdeck lethal range
             if (!HasPotentialLethalNextTurn(board))
             {
-                //Set lightning bolt spell modifier to 250% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
+                //Set lightning bolt spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
                 parameters.SpellsModifiers.AddOrUpdate(LightningBolt,
                     new Modifier(GetOverloadSpellConservativeModifier(board)));
 
-                //Set crackle spell modifier to 250% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
+                //Set crackle spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
                 parameters.SpellsModifiers.AddOrUpdate(Crackle,
                     new Modifier(GetOverloadSpellConservativeModifier(board)));
 
@@ -157,9 +157,9 @@ namespace SmartBotProfiles
                 parameters.SpellsModifiers.AddOrUpdate(RockbiterWeapon, new Modifier(400));
             }
 
-            if (ShouldDrawCards(board)) //If we don't have any overloaded or locked crystals
+            if (ShouldDrawCards(board)) //If we need to draw cards
             {
-                //Set AncestralKnowledge spell modifier to 20% of the base spell value defined in "Rush" profile, the bot will play the spell more easily
+                //Set AncestralKnowledge spell modifier to 0% of the base spell value defined in "Rush" profile, the bot will play the spell more easily
                 parameters.SpellsModifiers.AddOrUpdate(AncestralKnowledge, new Modifier(0));
                 parameters.GlobalDrawModifier = new Modifier(150);
             }
