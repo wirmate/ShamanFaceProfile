@@ -105,6 +105,9 @@ namespace SmartBotProfiles
             {FeralSpirit, CardTemplate.TemplateList[FeralSpirit].Overload}
         };
 
+        private readonly List<Card.Cards> _tauntMinionsTable =
+            CardTemplate.TemplateList.ToList().FindAll(x => x.Value.Taunt).ToDictionary(x => x.Key).Keys.ToList();
+
         public ProfileParameters GetParameters(Board board)
         {
             //Init profile parameter based on rush profile
@@ -123,7 +126,8 @@ namespace SmartBotProfiles
             parameters.SpellsModifiers.AddOrUpdate(TheCoin, new Modifier(70));
 
             //Lower earthshock modifier on Sludge belcher
-            parameters.SpellsModifiers.AddOrUpdate(EarthShock, new Modifier(20, SludgeBelcher));
+            //parameters.SpellsModifiers.AddOrUpdate(EarthShock, new Modifier(20, SludgeBelcher));
+            OverrideSilenceSpellsValueOnTauntMinions(ref parameters); //Lower silences values on taunts
 
             //Set KnifeJuggler modifier to 30% of the base value defined in "Rush" profile, the AI has more chances to play it
             parameters.MinionsModifiers.AddOrUpdate(KnifeJuggler, new Modifier(0));
@@ -133,7 +137,7 @@ namespace SmartBotProfiles
             {
                 //Set lightning bolt spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
                 parameters.SpellsModifiers.AddOrUpdate(LightningBolt,
-                    new Modifier(GetOverloadSpellConservativeModifier(board) / 3));
+                    new Modifier(GetOverloadSpellConservativeModifier(board)));
 
                 //Set crackle spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
                 parameters.SpellsModifiers.AddOrUpdate(Crackle,
@@ -209,8 +213,8 @@ namespace SmartBotProfiles
         {
             //Set TunnelTrogg modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
             parameters.MinionsModifiers.AddOrUpdate(TunnelTrogg, new Modifier(-100));
-			
-			 //Set LeperGnome modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
+
+            //Set LeperGnome modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
             parameters.MinionsModifiers.AddOrUpdate(LeperGnome, new Modifier(-100));
         }
 
@@ -240,6 +244,18 @@ namespace SmartBotProfiles
             foreach (var i in _minionsOverloadTable)
             {
                 parameters.MinionsModifiers.AddOrUpdate(i.Key, new Modifier(600));
+            }
+        }
+
+        private void OverrideSilenceSpellsValueOnTauntMinions(ref ProfileParameters parameters)
+        {
+            foreach (var card in _tauntMinionsTable)
+            {
+                if (CardTemplate.LoadFromId(card).Cost >= 2)
+                {
+                    parameters.SpellsModifiers.AddOrUpdate(EarthShock, new Modifier(20, card));
+                    parameters.MinionsModifiers.AddOrUpdate(IronbeakOwl, new Modifier(20, card));
+                }
             }
         }
 
@@ -292,7 +308,7 @@ namespace SmartBotProfiles
 
         private int GetPlayableSpellSequenceDamages(Board board, bool altogetherWithHammer = false)
         {
-            return GetSpellSequenceDamages(GetPlayableSpellSequence(board, altogetherWithHammer));
+            return GetSpellSequenceDamages(GetPlayableSpellSequence(board, altogetherWithHammer), board);
         }
 
         private int GetSecondTurnLethalRange(Board board)
@@ -305,9 +321,11 @@ namespace SmartBotProfiles
             return GetRemainingBlastDamagesAfterSequence(board) >= GetSecondTurnLethalRange(board);
         }
 
-        private int GetSpellSequenceDamages(List<Card.Cards> sequence)
+        private int GetSpellSequenceDamages(List<Card.Cards> sequence, Board board)
         {
-            return sequence.FindAll(x => _spellDamagesTable.ContainsKey(x)).Sum(x => _spellDamagesTable[x]);
+            return
+                sequence.FindAll(x => _spellDamagesTable.ContainsKey(x))
+                    .Sum(x => _spellDamagesTable[x] + GetSpellPower(board));
         }
 
         private List<Card.Cards> GetPlayableSpellSequence(Board board, bool altogetherWithHammer = false)
@@ -366,7 +384,12 @@ namespace SmartBotProfiles
             var handCount = board.Hand.Count(x => x.Template.Id == RockbiterWeapon);
             var manaAvailable = altogetherWithHammer ? board.ManaAvailable - 5 : board.ManaAvailable;
 
-            return Math.Max(handCount, manaAvailable <= 2 ? manaAvailable : handCount);
+            if (manaAvailable < handCount)
+            {
+                handCount = manaAvailable;
+            }
+
+            return handCount < 0 ? 0 : handCount;
         }
 
         private bool HasDoomhammerOnBoard(Board board)
