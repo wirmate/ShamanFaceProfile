@@ -179,9 +179,11 @@ namespace SmartBotProfiles
                 parameters.GlobalDrawModifier = new Modifier(50);
             }
 
-            //Turn specific handlers
-            switch (board.TurnCount)
+             if (board.TurnCount < 5)
             {
+                //Turn specific handlers
+                switch (board.ManaAvailable)
+                {
                 case 1:
                     HandleTurnOneSpecifics(board, ref parameters);
                     break;
@@ -189,6 +191,7 @@ namespace SmartBotProfiles
                 case 2:
                     HandleTurnTwoSpecifics(board, ref parameters);
                     break;
+				}
             }
 
             //If we can play doomhammer next turn we don't want to overload
