@@ -33,29 +33,6 @@ namespace SmartBotProfiles
         //Cards definitions
         private const Card.Cards TheCoin = Card.Cards.GAME_005;
 
-        private const Card.Cards EarthShock = Card.Cards.EX1_245;
-        private const Card.Cards LightningBolt = Card.Cards.EX1_238;
-        private const Card.Cards RockbiterWeapon = Card.Cards.CS2_045;
-        private const Card.Cards TunnelTrogg = Card.Cards.LOE_018;
-        private const Card.Cards AncestralKnowledge = Card.Cards.AT_053;
-        private const Card.Cards Crackle = Card.Cards.GVG_038;
-        private const Card.Cards LaveShock = Card.Cards.BRM_011;
-        private const Card.Cards TotemGolem = Card.Cards.AT_052;
-        private const Card.Cards ElementalDestruction = Card.Cards.AT_051;
-        private const Card.Cards FeralSpirit = Card.Cards.EX1_248;
-        private const Card.Cards Hex = Card.Cards.EX1_246;
-        private const Card.Cards LavaBurst = Card.Cards.EX1_241;
-        private const Card.Cards ManaTideTotem = Card.Cards.EX1_575;
-        private const Card.Cards DoomHammer = Card.Cards.EX1_567;
-        private const Card.Cards LeperGnome = Card.Cards.EX1_029;
-        private const Card.Cards BloodmageThalnos = Card.Cards.EX1_012;
-        private const Card.Cards LootHoarder = Card.Cards.EX1_096;
-        private const Card.Cards IronbeakOwl = Card.Cards.CS2_203;
-        private const Card.Cards UnboundElemental = Card.Cards.EX1_258;
-        private const Card.Cards ArcaneGolem = Card.Cards.EX1_089;
-        private const Card.Cards KnifeJuggler = Card.Cards.NEW1_019;
-        private const Card.Cards SludgeBelcher = Card.Cards.FP1_012;
-
         private const Card.Cards SteadyShot = Card.Cards.DS1h_292;
         private const Card.Cards Shapeshift = Card.Cards.CS2_017;
         private const Card.Cards LifeTap = Card.Cards.CS2_056;
@@ -82,27 +59,27 @@ namespace SmartBotProfiles
 
         private readonly Dictionary<Card.Cards, int> _minionsOverloadTable = new Dictionary<Card.Cards, int>
         {
-            {TotemGolem, CardTemplate.TemplateList[TotemGolem].Overload}
+            {Cards.TotemGolem, CardTemplate.TemplateList[Cards.TotemGolem].Overload}
         };
 
         private readonly Dictionary<Card.Cards, int> _spellDamagesTable = new Dictionary<Card.Cards, int>
         {
-            {EarthShock, 1},
-            {LightningBolt, 3},
-            {Crackle, 4},
-            {LavaBurst, 5},
-            {LaveShock, 2}
+            {Cards.EarthShock, 1},
+            {Cards.LightningBolt, 3},
+            {Cards.Crackle, 4},
+            {Cards.LavaBurst, 5},
+            {Cards.LavaShock, 2}
         };
 
         private readonly Dictionary<Card.Cards, int> _spellsOverloadTable = new Dictionary<Card.Cards, int>
         {
-            {LightningBolt, CardTemplate.TemplateList[LightningBolt].Overload},
-            {Crackle, CardTemplate.TemplateList[Crackle].Overload},
-            {LavaBurst, CardTemplate.TemplateList[LavaBurst].Overload},
-            {DoomHammer, CardTemplate.TemplateList[DoomHammer].Overload},
-            {ElementalDestruction, CardTemplate.TemplateList[ElementalDestruction].Overload},
-            {AncestralKnowledge, CardTemplate.TemplateList[AncestralKnowledge].Overload},
-            {FeralSpirit, CardTemplate.TemplateList[FeralSpirit].Overload}
+            {Cards.LightningBolt, CardTemplate.TemplateList[Cards.LightningBolt].Overload},
+            {Cards.Crackle, CardTemplate.TemplateList[Cards.Crackle].Overload},
+            {Cards.LavaBurst, CardTemplate.TemplateList[Cards.LavaBurst].Overload},
+            {Cards.Doomhammer, CardTemplate.TemplateList[Cards.Doomhammer].Overload},
+            {Cards.ElementalDestruction, CardTemplate.TemplateList[Cards.ElementalDestruction].Overload},
+            {Cards.AncestralKnowledge, CardTemplate.TemplateList[Cards.AncestralKnowledge].Overload},
+            {Cards.FeralSpirit, CardTemplate.TemplateList[Cards.FeralSpirit].Overload}
         };
 
         private readonly List<Card.Cards> _tauntMinionsTable =
@@ -117,10 +94,10 @@ namespace SmartBotProfiles
             parameters.GlobalAggroModifier.Value = AggroModifier;
 
             //Set FeralSpirit spell modifier to 20% of the base spell value defined in "Rush" profile, the AI has more chances to play this spell
-            parameters.SpellsModifiers.AddOrUpdate(FeralSpirit, new Modifier(20));
+            parameters.SpellsModifiers.AddOrUpdate(Cards.FeralSpirit, new Modifier(20));
 
             //Set lava shock spell modifier to 200% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand without any overloaded mana
-            parameters.SpellsModifiers.AddOrUpdate(LaveShock, new Modifier(200));
+            parameters.SpellsModifiers.AddOrUpdate(Cards.LavaShock, new Modifier(200));
 
             //Lower TheCoin modifier
             parameters.SpellsModifiers.AddOrUpdate(TheCoin, new Modifier(70));
@@ -130,48 +107,48 @@ namespace SmartBotProfiles
             OverrideSilenceSpellsValueOnTauntMinions(ref parameters); //Lower silences values on taunts
 
             //Set KnifeJuggler modifier to 30% of the base value defined in "Rush" profile, the AI has more chances to play it
-            parameters.MinionsModifiers.AddOrUpdate(KnifeJuggler, new Modifier(0));
+            parameters.MinionsModifiers.AddOrUpdate(Cards.KnifeJuggler, new Modifier(0));
 
             //If we cant put down enemy's life at topdeck lethal range
             if (!HasPotentialLethalNextTurn(board))
             {
                 //Set lightning bolt spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
-                parameters.SpellsModifiers.AddOrUpdate(LightningBolt,
+                parameters.SpellsModifiers.AddOrUpdate(Cards.LightningBolt,
                     new Modifier(GetOverloadSpellConservativeModifier(board)));
 
                 //Set crackle spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
-                parameters.SpellsModifiers.AddOrUpdate(Crackle,
+                parameters.SpellsModifiers.AddOrUpdate(Cards.Crackle,
                     new Modifier(GetOverloadSpellConservativeModifier(board)));
 
                 //Set lava burst spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand for lethal
-                parameters.SpellsModifiers.AddOrUpdate(LavaBurst,
+                parameters.SpellsModifiers.AddOrUpdate(Cards.LavaBurst,
                     new Modifier(GetOverloadSpellConservativeModifier(board)));
 
                 //Set lava burst spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand for lethal
-                parameters.MinionsModifiers.AddOrUpdate(ArcaneGolem, new Modifier(400));
+                parameters.MinionsModifiers.AddOrUpdate(Cards.ArcaneGolem, new Modifier(400));
             }
 
             if (!HasEnemyTauntOnBoard(board))
             {
                 //Set silence to 150% of its base value to try to keep it in hand if there's no enemy taunt on board
-                parameters.MinionsModifiers.AddOrUpdate(IronbeakOwl, new Modifier(150));
+                parameters.MinionsModifiers.AddOrUpdate(Cards.IronbeakOwl, new Modifier(150));
             }
             else
             {
                 //Set silence to 60% of its base value to make it easier to play if theres a taunt on board
-                parameters.MinionsModifiers.AddOrUpdate(IronbeakOwl, new Modifier(60));
+                parameters.MinionsModifiers.AddOrUpdate(Cards.IronbeakOwl, new Modifier(60));
             }
 
             if (!HasDoomhammerOnBoard(board)) //If we don't have doomhammer this turn
             {
                 //Set rockbiter spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand until we get doomhammer
-                parameters.SpellsModifiers.AddOrUpdate(RockbiterWeapon, new Modifier(400));
+                parameters.SpellsModifiers.AddOrUpdate(Cards.RockbiterWeapon, new Modifier(400));
             }
 
             if (ShouldDrawCards(board)) //If we need to draw cards
             {
                 //Set AncestralKnowledge spell modifier to 0% of the base spell value defined in "Rush" profile, the bot will play the spell more easily
-                parameters.SpellsModifiers.AddOrUpdate(AncestralKnowledge, new Modifier(0));
+                parameters.SpellsModifiers.AddOrUpdate(Cards.AncestralKnowledge, new Modifier(0));
                 parameters.GlobalDrawModifier = new Modifier(150);
             }
             else
@@ -179,19 +156,19 @@ namespace SmartBotProfiles
                 parameters.GlobalDrawModifier = new Modifier(50);
             }
 
-             if (board.TurnCount < 5)
+            if (board.TurnCount < 5)
             {
                 //Turn specific handlers
                 switch (board.ManaAvailable)
                 {
-                case 1:
-                    HandleTurnOneSpecifics(board, ref parameters);
-                    break;
+                    case 1:
+                        HandleTurnOneSpecifics(board, ref parameters);
+                        break;
 
-                case 2:
-                    HandleTurnTwoSpecifics(board, ref parameters);
-                    break;
-				}
+                    case 2:
+                        HandleTurnTwoSpecifics(board, ref parameters);
+                        break;
+                }
             }
 
             //If we can play doomhammer next turn we don't want to overload
@@ -215,21 +192,21 @@ namespace SmartBotProfiles
         private void HandleTurnOneSpecifics(Board board, ref ProfileParameters parameters)
         {
             //Set TunnelTrogg modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
-            parameters.MinionsModifiers.AddOrUpdate(TunnelTrogg, new Modifier(-100));
+            parameters.MinionsModifiers.AddOrUpdate(Cards.TunnelTrogg, new Modifier(-100));
 
             //Set LeperGnome modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
-            parameters.MinionsModifiers.AddOrUpdate(LeperGnome, new Modifier(-100));
+            parameters.MinionsModifiers.AddOrUpdate(Cards.LeperGnome, new Modifier(-100));
         }
 
         private void HandleTurnTwoSpecifics(Board board, ref ProfileParameters parameters)
         {
             //Set UnboundElemental modifier to -500% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
-            parameters.MinionsModifiers.AddOrUpdate(UnboundElemental, new Modifier(-500));
+            parameters.MinionsModifiers.AddOrUpdate(Cards.UnboundElemental, new Modifier(-500));
         }
 
         private int GetOverloadSpellConservativeModifier(Board board)
         {
-            return HasCardOnBoard(TunnelTrogg, board)
+            return HasCardOnBoard(Cards.TunnelTrogg, board)
                 ? OverloadSpellsConservativeModifier/2
                 : OverloadSpellsConservativeModifier;
         }
@@ -256,8 +233,8 @@ namespace SmartBotProfiles
             {
                 if (CardTemplate.LoadFromId(card).Cost >= 2)
                 {
-                    parameters.SpellsModifiers.AddOrUpdate(EarthShock, new Modifier(20, card));
-                    parameters.MinionsModifiers.AddOrUpdate(IronbeakOwl, new Modifier(20, card));
+                    parameters.SpellsModifiers.AddOrUpdate(Cards.EarthShock, new Modifier(20, card));
+                    parameters.MinionsModifiers.AddOrUpdate(Cards.IronbeakOwl, new Modifier(20, card));
                 }
             }
         }
@@ -279,7 +256,8 @@ namespace SmartBotProfiles
             {
                 return true;
             }
-            if (board.Hand.Any(x => x.Template.Id == AncestralKnowledge) && GetManaLeftAfterPlayingMinions(board) >= 2)
+            if (board.Hand.Any(x => x.Template.Id == Cards.AncestralKnowledge) &&
+                GetManaLeftAfterPlayingMinions(board) >= 2)
             {
                 return true;
             }
@@ -384,7 +362,7 @@ namespace SmartBotProfiles
 
         private int GetPlayableRockbiters(Board board, bool altogetherWithHammer = false)
         {
-            var handCount = board.Hand.Count(x => x.Template.Id == RockbiterWeapon);
+            var handCount = board.Hand.Count(x => x.Template.Id == Cards.RockbiterWeapon);
             var manaAvailable = altogetherWithHammer ? board.ManaAvailable - 5 : board.ManaAvailable;
 
             if (manaAvailable < handCount)
@@ -397,12 +375,12 @@ namespace SmartBotProfiles
 
         private bool HasDoomhammerOnBoard(Board board)
         {
-            return board.WeaponFriend != null && board.WeaponFriend.Template.Id == DoomHammer;
+            return board.WeaponFriend != null && board.WeaponFriend.Template.Id == Cards.Doomhammer;
         }
 
         private bool HasDommhammerInHand(Board board)
         {
-            return board.Hand.Any(x => x.Template.Id == DoomHammer);
+            return board.Hand.Any(x => x.Template.Id == Cards.Doomhammer);
         }
 
         private bool CanPlayDoomhammer(Board board)
