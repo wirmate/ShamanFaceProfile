@@ -85,6 +85,15 @@ namespace SmartBotProfiles
         private readonly List<Card.Cards> _tauntMinionsTable =
             CardTemplate.TemplateList.ToList().FindAll(x => x.Value.Taunt).ToDictionary(x => x.Key).Keys.ToList();
 
+        private readonly Dictionary<KeyValuePair<Card.Cards, Card.Cards>, int> _threatsModifiersTable = new Dictionary
+            <KeyValuePair<Card.Cards, Card.Cards>, int>
+        {
+            {new KeyValuePair<Card.Cards, Card.Cards>(Cards.Crackle, Cards.TunnelTrogg), 30},
+            {new KeyValuePair<Card.Cards, Card.Cards>(Cards.LightningBolt, Cards.TunnelTrogg), 30},
+            {new KeyValuePair<Card.Cards, Card.Cards>(Cards.Crackle, Cards.VitalityTotem), 30},
+            {new KeyValuePair<Card.Cards, Card.Cards>(Cards.LightningBolt, Cards.VitalityTotem), 30}
+        };
+
         public ProfileParameters GetParameters(Board board)
         {
             //Init profile parameter based on rush profile
@@ -98,6 +107,8 @@ namespace SmartBotProfiles
 
             //Set lava shock spell modifier to 200% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand without any overloaded mana
             parameters.SpellsModifiers.AddOrUpdate(Cards.LavaShock, new Modifier(200));
+
+            parameters.SpellsModifiers.AddOrUpdate(Cards.EarthShock, new Modifier(250));
 
             //Lower TheCoin modifier
             parameters.SpellsModifiers.AddOrUpdate(TheCoin, new Modifier(70));
@@ -180,6 +191,9 @@ namespace SmartBotProfiles
                 OverrideOverloadSpellsModifiers(ref parameters);
             }
 
+            //Reduce spells values over threatening minions
+            OverrideSpellsValuesOnThreats(ref parameters);
+
             return parameters;
         }
 
@@ -191,8 +205,22 @@ namespace SmartBotProfiles
 
         private void HandleTurnOneSpecifics(Board board, ref ProfileParameters parameters)
         {
-            //Set TunnelTrogg modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
-            parameters.MinionsModifiers.AddOrUpdate(Cards.TunnelTrogg, new Modifier(-100));
+            if (
+                board.Hand.Count(
+                    x => x.CurrentCost == 1 && x.Type == Card.CType.MINION && x.Template.Id != Cards.AbusiveSergeant) ==
+                1)
+                parameters.SpellsModifiers.AddOrUpdate(Card.Cards.GAME_005, new Modifier(200));
+
+            //Prefer sirfinley over trogg 
+            if (board.HasCardInHand(Cards.TunnelTrogg) && board.HasCardInHand(Cards.SirFinleyMrrgglton))
+            {
+                parameters.MinionsModifiers.AddOrUpdate(Cards.SirFinleyMrrgglton, new Modifier(-500));
+            }
+            else
+            {
+                //Set TunnelTrogg modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
+                parameters.MinionsModifiers.AddOrUpdate(Cards.TunnelTrogg, new Modifier(-100));
+            }
 
             //Set LeperGnome modifier to -100% of the base value defined in "Rush" profile, the bot will try as much as possible to play the card
             parameters.MinionsModifiers.AddOrUpdate(Cards.LeperGnome, new Modifier(-100));
@@ -206,7 +234,7 @@ namespace SmartBotProfiles
 
         private int GetOverloadSpellConservativeModifier(Board board)
         {
-            return HasCardOnBoard(Cards.TunnelTrogg, board)
+            return HasCardOnBoard(Cards.TunnelTrogg, board) && board.MinionEnemy.Count == 0
                 ? OverloadSpellsConservativeModifier/2
                 : OverloadSpellsConservativeModifier;
         }
@@ -236,6 +264,14 @@ namespace SmartBotProfiles
                     parameters.SpellsModifiers.AddOrUpdate(Cards.EarthShock, new Modifier(20, card));
                     parameters.MinionsModifiers.AddOrUpdate(Cards.IronbeakOwl, new Modifier(20, card));
                 }
+            }
+        }
+
+        private void OverrideSpellsValuesOnThreats(ref ProfileParameters parameters)
+        {
+            foreach (var card in _threatsModifiersTable)
+            {
+                parameters.SpellsModifiers.AddOrUpdate(card.Key.Key, new Modifier(card.Value, card.Key.Value));
             }
         }
 
