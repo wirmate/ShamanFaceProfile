@@ -91,7 +91,8 @@ namespace SmartBotProfiles
             {new KeyValuePair<Card.Cards, Card.Cards>(Cards.Crackle, Cards.TunnelTrogg), 30},
             {new KeyValuePair<Card.Cards, Card.Cards>(Cards.LightningBolt, Cards.TunnelTrogg), 30},
             {new KeyValuePair<Card.Cards, Card.Cards>(Cards.Crackle, Cards.VitalityTotem), 30},
-            {new KeyValuePair<Card.Cards, Card.Cards>(Cards.LightningBolt, Cards.VitalityTotem), 30}
+            {new KeyValuePair<Card.Cards, Card.Cards>(Cards.LightningBolt, Cards.VitalityTotem), 30},
+            {new KeyValuePair<Card.Cards, Card.Cards>(Cards.EarthShock, Cards.LeperGnome), 30}
         };
 
         public ProfileParameters GetParameters(Board board)
