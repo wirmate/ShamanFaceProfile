@@ -30,6 +30,7 @@ namespace SmartBotProfiles
     [Serializable]
     public class ShamanFace : Profile
     {
+        private const bool Debug = false;
         //Cards definitions
         private const Card.Cards TheCoin = Card.Cards.GAME_005;
 
@@ -42,14 +43,11 @@ namespace SmartBotProfiles
         private const Card.Cards LesserHeal = Card.Cards.CS1h_001;
         private const Card.Cards DaggerMastery = Card.Cards.CS2_083b;
 
-        private const int AggroModifier = 300;
-        private const int OverloadSpellsConservativeModifier = 400;
-
-        private readonly Dictionary<Card.Cards, int> _heroPowersPriorityTable = new Dictionary<Card.Cards, int>
+        private static readonly Dictionary<Card.Cards, int> _heroPowersPriorityTable = new Dictionary<Card.Cards, int>
         {
             {SteadyShot, 8},
-            {Shapeshift, 7},
-            {LifeTap, 6},
+            {Shapeshift, 6},
+            {LifeTap, 7},
             {Fireblast, 5},
             {Reinforce, 4},
             {ArmorUp, 3},
@@ -57,21 +55,32 @@ namespace SmartBotProfiles
             {DaggerMastery, 1}
         };
 
-        private readonly Dictionary<Card.Cards, int> _minionsOverloadTable = new Dictionary<Card.Cards, int>
+        private static readonly Dictionary<Card.Cards, int> _minionsOverloadTable = new Dictionary<Card.Cards, int>
         {
             {Cards.TotemGolem, CardTemplate.TemplateList[Cards.TotemGolem].Overload}
         };
 
-        private readonly Dictionary<Card.Cards, int> _spellDamagesTable = new Dictionary<Card.Cards, int>
+        private static readonly Dictionary<Card.Cards, int> _spellDamagesTable = new Dictionary<Card.Cards, int>
         {
-            {Cards.EarthShock, 1},
             {Cards.LightningBolt, 3},
             {Cards.Crackle, 4},
             {Cards.LavaBurst, 5},
             {Cards.LavaShock, 2}
         };
 
-        private readonly Dictionary<Card.Cards, int> _spellsOverloadTable = new Dictionary<Card.Cards, int>
+        private static readonly Dictionary<Card.Cards, int> _spellsOverloadModifierTable = new Dictionary
+            <Card.Cards, int>
+        {
+            {Cards.LightningBolt, 300},
+            {Cards.Crackle, 400},
+            {Cards.LavaBurst, 500},
+            {Cards.Doomhammer, 400},
+            {Cards.ElementalDestruction, 400},
+            {Cards.AncestralKnowledge, 400},
+            {Cards.FeralSpirit, 400}
+        };
+
+        private static readonly Dictionary<Card.Cards, int> _spellsOverloadTable = new Dictionary<Card.Cards, int>
         {
             {Cards.LightningBolt, CardTemplate.TemplateList[Cards.LightningBolt].Overload},
             {Cards.Crackle, CardTemplate.TemplateList[Cards.Crackle].Overload},
@@ -82,10 +91,11 @@ namespace SmartBotProfiles
             {Cards.FeralSpirit, CardTemplate.TemplateList[Cards.FeralSpirit].Overload}
         };
 
-        private readonly List<Card.Cards> _tauntMinionsTable =
+
+        private static readonly List<Card.Cards> _tauntMinionsTable =
             CardTemplate.TemplateList.ToList().FindAll(x => x.Value.Taunt).ToDictionary(x => x.Key).Keys.ToList();
 
-        private readonly Dictionary<KeyValuePair<Card.Cards, Card.Cards>, int> _threatsModifiersTable = new Dictionary
+        private static readonly Dictionary<KeyValuePair<Card.Cards, Card.Cards>, int> _threatsModifiersTable = new Dictionary
             <KeyValuePair<Card.Cards, Card.Cards>, int>
         {
             {new KeyValuePair<Card.Cards, Card.Cards>(Cards.Crackle, Cards.TunnelTrogg), 30},
@@ -101,63 +111,84 @@ namespace SmartBotProfiles
             var parameters = new ProfileParameters(BaseProfile.Rush);
 
             //300% of default "Rush" profile value -> the bot will be more aggressive
-            parameters.GlobalAggroModifier.Value = AggroModifier;
+            if (board.TurnCount <= 4 || board.HeroEnemy.CurrentHealth > 18)
+            {
+                parameters.GlobalAggroModifier.Value = 150;
 
-            //Set FeralSpirit spell modifier to 20% of the base spell value defined in "Rush" profile, the AI has more chances to play this spell
-            parameters.SpellsModifiers.AddOrUpdate(Cards.FeralSpirit, new Modifier(20));
+                foreach (var card in board.MinionFriend)
+                {
+                    parameters.BoardFriendlyMinionsModifiers.AddOrUpdate(card.Template.Id, new Modifier(200));
+                }
+            }
+            else
+                parameters.GlobalAggroModifier.Value = 300;
 
-            //Set lava shock spell modifier to 200% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand without any overloaded mana
-            parameters.SpellsModifiers.AddOrUpdate(Cards.LavaShock, new Modifier(200));
-
-            parameters.SpellsModifiers.AddOrUpdate(Cards.EarthShock, new Modifier(250));
-
-            //Lower TheCoin modifier
-            parameters.SpellsModifiers.AddOrUpdate(TheCoin, new Modifier(70));
+            HandleSpells(ref parameters, board);
+            HandleMinions(ref parameters, board);
 
             //Lower earthshock modifier on Sludge belcher
             //parameters.SpellsModifiers.AddOrUpdate(EarthShock, new Modifier(20, SludgeBelcher));
             OverrideSilenceSpellsValueOnTauntMinions(ref parameters); //Lower silences values on taunts
 
-            //Set KnifeJuggler modifier to 30% of the base value defined in "Rush" profile, the AI has more chances to play it
-            parameters.MinionsModifiers.AddOrUpdate(Cards.KnifeJuggler, new Modifier(0));
+
+            Log("Potential Damages in hand : " + BoardHelper.GetTotalBlastDamagesInHand(board));
+            Log("Potential Weapon: " + BoardHelper.GetPotentialWeaponDamages(board));
+            Log("Potential minions: " + board.MinionFriend.Sum(x => x.CurrentAtk));
+            Log("Lethal next turn : " + BoardHelper.HasPotentialLethalNextTurn(board));
+            Log("Lethal next turn without spells : " + BoardHelper.HasPotentialLethalNextTurnWithoutSpells(board));
+            Log("Next turn attackers from hand : " +
+                string.Join(" - ",
+                    BoardHelper.GetPlayableMinionSequenceAttacker(BoardHelper.GetPlayableMinionSequence(board),
+                        board)));
+            Log("Next turn attackers from board : " +
+                string.Join(" - ", BoardHelper.GetPotentialMinionAttacker(board)));
 
             //If we cant put down enemy's life at topdeck lethal range
-            if (!HasPotentialLethalNextTurn(board))
+            if (!BoardHelper.HasPotentialLethalNextTurn(board)
+                ||
+                (BoardHelper.HasPotentialLethalNextTurn(board) &&
+                 BoardHelper.HasPotentialLethalNextTurnWithoutSpells(board)))
             {
-                //Set lightning bolt spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
-                parameters.SpellsModifiers.AddOrUpdate(Cards.LightningBolt,
-                    new Modifier(GetOverloadSpellConservativeModifier(board)));
+                if (BoardHelper.HasPotentialLethalNextTurnWithoutSpells(board))
+                    parameters.GlobalAggroModifier.Value = 100;
 
                 //Set crackle spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand before turn 6
                 parameters.SpellsModifiers.AddOrUpdate(Cards.Crackle,
-                    new Modifier(GetOverloadSpellConservativeModifier(board)));
+                    new Modifier(GetOverloadSpellConservativeModifier(board, Cards.Crackle)));
+
+                parameters.SpellsModifiers.AddOrUpdate(Cards.Crackle,
+                    new Modifier(GetOverloadSpellConservativeModifier(board, Cards.Crackle), board.HeroEnemy.Id));
 
                 //Set lava burst spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand for lethal
                 parameters.SpellsModifiers.AddOrUpdate(Cards.LavaBurst,
-                    new Modifier(GetOverloadSpellConservativeModifier(board)));
-
+                    new Modifier(GetOverloadSpellConservativeModifier(board, Cards.LavaBurst)));
+                parameters.SpellsModifiers.AddOrUpdate(Cards.LavaBurst,
+                    new Modifier(GetOverloadSpellConservativeModifier(board, Cards.LavaBurst), board.HeroEnemy.Id));
                 //Set lava burst spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand for lethal
                 parameters.MinionsModifiers.AddOrUpdate(Cards.ArcaneGolem, new Modifier(400));
             }
 
-            if (!HasEnemyTauntOnBoard(board))
+            if (BoardHelper.HasPotentialLethalNextTurn(board) &&
+                !BoardHelper.HasPotentialLethalNextTurnWithoutSpells(board))
             {
-                //Set silence to 150% of its base value to try to keep it in hand if there's no enemy taunt on board
-                parameters.MinionsModifiers.AddOrUpdate(Cards.IronbeakOwl, new Modifier(150));
+                PreventSpellFromBeingPlayedOnMinions(ref parameters, board);
+                parameters.GlobalAggroModifier.Value = 400;
+            }
+
+            if (BoardHelper.HasDoomhammerOnBoard(board) ||
+                (board.TurnCount <= 5 && !board.HasCardInHand(Cards.LightningBolt)))
+                //If we don't have doomhammer this turn
+            {
+                //Set rockbiter spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand until we get doomhammer
+                parameters.SpellsModifiers.AddOrUpdate(Cards.RockbiterWeapon,
+                    new Modifier(board.TurnCount > 4 ? 200 : 100));
             }
             else
             {
-                //Set silence to 60% of its base value to make it easier to play if theres a taunt on board
-                parameters.MinionsModifiers.AddOrUpdate(Cards.IronbeakOwl, new Modifier(60));
-            }
-
-            if (!HasDoomhammerOnBoard(board)) //If we don't have doomhammer this turn
-            {
-                //Set rockbiter spell modifier to 400% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand until we get doomhammer
                 parameters.SpellsModifiers.AddOrUpdate(Cards.RockbiterWeapon, new Modifier(400));
             }
 
-            if (ShouldDrawCards(board)) //If we need to draw cards
+            if (BoardHelper.ShouldDrawCards(board)) //If we need to draw cards
             {
                 //Set AncestralKnowledge spell modifier to 0% of the base spell value defined in "Rush" profile, the bot will play the spell more easily
                 parameters.SpellsModifiers.AddOrUpdate(Cards.AncestralKnowledge, new Modifier(0));
@@ -184,16 +215,18 @@ namespace SmartBotProfiles
             }
 
             //If we can play doomhammer next turn we don't want to overload
-            if (!HasDoomhammerOnBoard(board) && CanPlayDoomhammerNextTurn(board))
+            /*  if (!BoardHelper.HasDoomhammerOnBoard(board) && BoardHelper.CanPlayDoomhammerNextTurn(board))
             {
                 if (board.MinionFriend.Count > 0)
                     OverrideOverloadMinionsModifiers(ref parameters);
 
                 OverrideOverloadSpellsModifiers(ref parameters);
-            }
+            }*/
 
             //Reduce spells values over threatening minions
             OverrideSpellsValuesOnThreats(ref parameters);
+
+            Log("AggroMod : " + parameters.GlobalAggroModifier.Value);
 
             return parameters;
         }
@@ -204,14 +237,85 @@ namespace SmartBotProfiles
             return filteredTable.First(x => x.Value == filteredTable.Max(y => y.Value)).Key;
         }
 
+        private static void Log(string str)
+        {
+            if (Debug)
+                Bot.Log(str);
+        }
+
+        private void PreventSpellFromBeingPlayedOnMinions(ref ProfileParameters parameters, Board board)
+        {
+            foreach (var card in board.MinionEnemy.FindAll(x => !x.IsTaunt))
+            {
+                parameters.SpellsModifiers.AddOrUpdate(Cards.LightningBolt, new Modifier(500, card.Id));
+                parameters.SpellsModifiers.AddOrUpdate(Cards.LavaBurst, new Modifier(500, card.Id));
+            }
+        }
+
+        public void HandleSpells(ref ProfileParameters parameters, Board board)
+        {
+            //Set FeralSpirit spell modifier to 20% of the base spell value defined in "Rush" profile, the AI has more chances to play this spell
+            parameters.SpellsModifiers.AddOrUpdate(Cards.FeralSpirit, new Modifier(100));
+
+            //Set lava shock spell modifier to 200% of the base spell value defined in "Rush" profile, the bot will try to keep this spell in hand without any overloaded mana
+            parameters.SpellsModifiers.AddOrUpdate(Cards.LavaShock, new Modifier(200));
+
+            parameters.SpellsModifiers.AddOrUpdate(Cards.EarthShock, new Modifier(250));
+
+            parameters.SpellsModifiers.AddOrUpdate(Cards.LightningBolt, new Modifier(300, board.HeroEnemy.Id));
+
+            //Lower TheCoin modifier
+            parameters.SpellsModifiers.AddOrUpdate(TheCoin, new Modifier(50));
+        }
+
+        public void HandleMinions(ref ProfileParameters parameters, Board board)
+        {
+            //Set KnifeJuggler modifier to 0% of the base value defined in "Rush" profile, the AI has more chances to play it
+            parameters.MinionsModifiers.AddOrUpdate(Cards.KnifeJuggler, new Modifier(0));
+
+            parameters.MinionsModifiers.AddOrUpdate(Cards.FlametongueTotem, new Modifier(250));
+            foreach (var card in board.MinionFriend.FindAll(x => x.CanAttack))
+            {
+                if (
+                    board.MinionEnemy.Any(
+                        x =>
+                            x.CurrentHealth <= card.CurrentAtk + 2 && x.CurrentHealth > card.CurrentAtk &&
+                            !x.IsDivineShield))
+                {
+                    parameters.MinionsModifiers.AddOrUpdate(Cards.AbusiveSergeant, new Modifier(100));
+                }
+            }
+
+            //Use abusive to kill minions
+            foreach (var card in board.MinionFriend.FindAll(x => x.CanAttack))
+            {
+                if (
+                    board.MinionEnemy.Any(
+                        x =>
+                            x.CurrentHealth <= card.CurrentAtk + 2 && x.CurrentHealth > card.CurrentAtk &&
+                            !x.IsDivineShield))
+                {
+                    parameters.MinionsModifiers.AddOrUpdate(Cards.AbusiveSergeant, new Modifier(0));
+
+                    if (board.ManaAvailable == 0)
+                        parameters.SpellsModifiers.AddOrUpdate(TheCoin, new Modifier(0));
+                }
+            }
+
+            if (!BoardHelper.HasEnemyTauntOnBoard(board))
+            {
+                //Set silence to 150% of its base value to try to keep it in hand if there's no enemy taunt on board
+                parameters.MinionsModifiers.AddOrUpdate(Cards.IronbeakOwl, new Modifier(150));
+            }
+            else
+            {
+                //Set silence to 60% of its base value to make it easier to play if theres a taunt on board
+                parameters.MinionsModifiers.AddOrUpdate(Cards.IronbeakOwl, new Modifier(60));
+            }
+        }
+
         private void HandleTurnOneSpecifics(Board board, ref ProfileParameters parameters)
         {
-            if (
-                board.Hand.Count(
-                    x => x.CurrentCost == 1 && x.Type == Card.CType.MINION && x.Template.Id != Cards.AbusiveSergeant) ==
-                1)
-                parameters.SpellsModifiers.AddOrUpdate(Card.Cards.GAME_005, new Modifier(200));
-
             //Prefer sirfinley over trogg 
             if (board.HasCardInHand(Cards.TunnelTrogg) && board.HasCardInHand(Cards.SirFinleyMrrgglton))
             {
@@ -233,11 +337,11 @@ namespace SmartBotProfiles
             parameters.MinionsModifiers.AddOrUpdate(Cards.UnboundElemental, new Modifier(-500));
         }
 
-        private int GetOverloadSpellConservativeModifier(Board board)
+        private int GetOverloadSpellConservativeModifier(Board board, Card.Cards id)
         {
-            return HasCardOnBoard(Cards.TunnelTrogg, board) && board.MinionEnemy.Count == 0
-                ? OverloadSpellsConservativeModifier/2
-                : OverloadSpellsConservativeModifier;
+            return BoardHelper.HasCardOnBoard(Cards.TunnelTrogg, board) && board.MinionEnemy.Count == 0
+                ? _spellsOverloadModifierTable[id]/2
+                : _spellsOverloadModifierTable[id];
         }
 
         private void OverrideOverloadSpellsModifiers(ref ProfileParameters parameters)
@@ -276,158 +380,252 @@ namespace SmartBotProfiles
             }
         }
 
-        private bool HasEnemyTauntOnBoard(Board board)
+        public static class BoardHelper
         {
-            return board.MinionEnemy.Any(x => x.IsTaunt && !x.IsStealth);
-        }
-
-        private bool HasCardOnBoard(Card.Cards card, Board board)
-        {
-            return board.MinionFriend.Any(x => x.Template.Id == card);
-        }
-
-        private bool ShouldDrawCards(Board board)
-        {
-            if (board.Hand.Count(x => x.Type == Card.CType.MINION) < 2 && board.ManaAvailable > 2 &&
-                board.Ability.Template.Id == LifeTap)
+            public static bool HasEnemyTauntOnBoard(Board board)
             {
-                return true;
-            }
-            if (board.Hand.Any(x => x.Template.Id == Cards.AncestralKnowledge) &&
-                GetManaLeftAfterPlayingMinions(board) >= 2)
-            {
-                return true;
-            }
-            return false;
-        }
-
-        private bool ShouldPlayDoomhammer(Board board)
-        {
-            return !HasDoomhammerOnBoard(board) && HasDommhammerInHand(board) && CanPlayDoomhammer(board);
-        }
-
-        private int GetManaLeftAfterPlayingMinions(Board board)
-        {
-            var ret = board.ManaAvailable -
-                      board.Hand.FindAll(x => x.Template.Type == Card.CType.MINION).Sum(x => x.CurrentCost);
-
-            return ret < 0 ? 0 : ret;
-        }
-
-        private int GetEnemyHealthAndArmor(Board board)
-        {
-            return board.HeroEnemy.CurrentHealth + board.HeroEnemy.CurrentArmor;
-        }
-
-        private int GetSpellPower(Board board)
-        {
-            return board.MinionFriend.FindAll(x => x.IsSilenced == false).Sum(x => x.SpellPower);
-        }
-
-        private int GetPlayableSpellSequenceDamages(Board board, bool altogetherWithHammer = false)
-        {
-            return GetSpellSequenceDamages(GetPlayableSpellSequence(board, altogetherWithHammer), board);
-        }
-
-        private int GetSecondTurnLethalRange(Board board)
-        {
-            return GetEnemyHealthAndArmor(board) - GetPotentialFaceDamages(board);
-        }
-
-        private bool HasPotentialLethalNextTurn(Board board)
-        {
-            return GetRemainingBlastDamagesAfterSequence(board) >= GetSecondTurnLethalRange(board);
-        }
-
-        private int GetSpellSequenceDamages(List<Card.Cards> sequence, Board board)
-        {
-            return
-                sequence.FindAll(x => _spellDamagesTable.ContainsKey(x))
-                    .Sum(x => _spellDamagesTable[x] + GetSpellPower(board));
-        }
-
-        private List<Card.Cards> GetPlayableSpellSequence(Board board, bool altogetherWithHammer = false)
-        {
-            var ret = new List<Card.Cards>();
-            var manaAvailable = altogetherWithHammer ? board.ManaAvailable - 5 : board.ManaAvailable;
-
-            foreach (var card in board.Hand)
-            {
-                if (_spellDamagesTable.ContainsKey(card.Template.Id) == false) continue;
-                if (manaAvailable < card.CurrentCost) continue;
-
-                ret.Add(card.Template.Id);
-                manaAvailable -= card.CurrentCost;
+                return board.MinionEnemy.Any(x => x.IsTaunt && !x.IsStealth);
             }
 
-            return ret;
-        }
-
-        private int GetPotentialFaceDamages(Board board)
-        {
-            return GetPotentialWeaponDamages(board) +
-                   GetPlayableSpellSequenceDamages(board, ShouldPlayDoomhammer(board));
-        }
-
-        private int GetRemainingBlastDamagesAfterSequence(Board board)
-        {
-            return GetTotalBlastDamagesInHand(board) -
-                   GetPlayableSpellSequenceDamages(board, ShouldPlayDoomhammer(board));
-        }
-
-        private int GetTotalBlastDamagesInHand(Board board)
-        {
-            return
-                board.Hand.FindAll(x => _spellDamagesTable.ContainsKey(x.Template.Id))
-                    .Sum(x => _spellDamagesTable[x.Template.Id] + GetSpellPower(board));
-        }
-
-        private int GetPotentialWeaponDamages(Board board)
-        {
-            if (HasDoomhammerOnBoard(board))
+            public static bool HasCardOnBoard(Card.Cards card, Board board)
             {
-                return (2 + GetPlayableRockbiters(board)*3)*(2 - board.HeroFriend.CountAttack);
+                return board.MinionFriend.Any(x => x.Template.Id == card);
             }
 
-            if (HasDommhammerInHand(board) && CanPlayDoomhammer(board))
+            public static bool ShouldDrawCards(Board board)
             {
-                return (2 + GetPlayableRockbiters(board, true)*3)*(2 - board.HeroFriend.CountAttack);
+                if (board.Hand.Count(x => x.Type == Card.CType.MINION) < 2 && board.ManaAvailable > 2 &&
+                    board.Ability.Template.Id == LifeTap)
+                {
+                    return true;
+                }
+                if (board.Hand.Any(x => x.Template.Id == Cards.AncestralKnowledge) &&
+                    GetManaLeftAfterPlayingMinions(board) >= 2)
+                {
+                    return true;
+                }
+                return false;
             }
 
-            return 0;
-        }
-
-        private int GetPlayableRockbiters(Board board, bool altogetherWithHammer = false)
-        {
-            var handCount = board.Hand.Count(x => x.Template.Id == Cards.RockbiterWeapon);
-            var manaAvailable = altogetherWithHammer ? board.ManaAvailable - 5 : board.ManaAvailable;
-
-            if (manaAvailable < handCount)
+            public static bool ShouldPlayDoomhammer(Board board)
             {
-                handCount = manaAvailable;
+                return !HasDoomhammerOnBoard(board) && HasDommhammerInHand(board) && CanPlayDoomhammer(board);
             }
 
-            return handCount < 0 ? 0 : handCount;
-        }
+            public static int GetManaLeftAfterPlayingMinions(Board board)
+            {
+                var ret = board.ManaAvailable -
+                          board.Hand.FindAll(x => x.Template.Type == Card.CType.MINION).Sum(x => x.CurrentCost);
 
-        private bool HasDoomhammerOnBoard(Board board)
-        {
-            return board.WeaponFriend != null && board.WeaponFriend.Template.Id == Cards.Doomhammer;
-        }
+                return ret < 0 ? 0 : ret;
+            }
 
-        private bool HasDommhammerInHand(Board board)
-        {
-            return board.Hand.Any(x => x.Template.Id == Cards.Doomhammer);
-        }
+            public static int GetEnemyHealthAndArmor(Board board)
+            {
+                return board.HeroEnemy.CurrentHealth + board.HeroEnemy.CurrentArmor;
+            }
 
-        private bool CanPlayDoomhammer(Board board)
-        {
-            return board.ManaAvailable >= 5;
-        }
+            public static int GetSpellPower(Board board)
+            {
+                return board.MinionFriend.FindAll(x => x.IsSilenced == false).Sum(x => x.SpellPower);
+            }
 
-        private bool CanPlayDoomhammerNextTurn(Board board)
-        {
-            return board.ManaAvailable - board.LockedMana + 1 >= 5 && HasDommhammerInHand(board);
+            public static int GetPlayableSpellSequenceDamages(Board board, bool altogetherWithHammer = false)
+            {
+                return GetSpellSequenceDamages(GetPlayableSpellSequence(board, altogetherWithHammer), board);
+            }
+
+            public static int GetSecondTurnLethalRange(Board board)
+            {
+                return GetEnemyHealthAndArmor(board) - GetPotentialFaceDamages(board);
+            }
+
+            public static bool HasPotentialLethalNextTurn(Board board)
+            {
+                if (!board.MinionEnemy.Any(x => x.IsTaunt) &&
+                    (GetEnemyHealthAndArmor(board) -
+                     GetPotentialMinionDamages(board) -
+                     GetPotentialWeaponDamages(board) - (WillHaveDoomhammerNextTurn(board) ? 4 : 0) -
+                     GetPlayableMinionSequenceDamages(GetPlayableMinionSequence(board), board) <=
+                     GetTotalBlastDamagesInHand(board)))
+                    return true;
+                return GetRemainingBlastDamagesAfterSequence(board) >= GetSecondTurnLethalRange(board);
+            }
+
+            public static bool HasPotentialLethalNextTurnWithoutSpells(Board board)
+            {
+                if (!board.MinionEnemy.Any(x => x.IsTaunt) &&
+                    (GetEnemyHealthAndArmor(board) -
+                     GetPotentialMinionDamages(board) -
+                     GetPotentialWeaponDamages(board) - (WillHaveDoomhammerNextTurn(board) ? 4 : 0) -
+                     GetPlayableMinionSequenceDamages(GetPlayableMinionSequence(board), board) <=
+                     0))
+                    return true;
+                return false;
+            }
+
+
+            public static int GetSpellSequenceDamages(List<Card.Cards> sequence, Board board)
+            {
+                return
+                    sequence.FindAll(x => _spellDamagesTable.ContainsKey(x))
+                        .Sum(x => _spellDamagesTable[x] + GetSpellPower(board));
+            }
+
+            public static bool WillHaveDoomhammerNextTurn(Board board)
+            {
+                if (board.WeaponFriend == null) return false;
+                return board.WeaponFriend.CurrentDurability - board.HeroFriend.CountAttack >= 2;
+            }
+
+            public static List<Card.Cards> GetPlayableSpellSequence(Board board, bool altogetherWithHammer = false)
+            {
+                var ret = new List<Card.Cards>();
+                var manaAvailable = altogetherWithHammer ? board.ManaAvailable - 5 : board.ManaAvailable;
+
+                foreach (var card in board.Hand.OrderBy(x => x.CurrentCost))
+                {
+                    if (_spellDamagesTable.ContainsKey(card.Template.Id) == false) continue;
+                    if (manaAvailable < card.CurrentCost) continue;
+
+                    ret.Add(card.Template.Id);
+                    manaAvailable -= card.CurrentCost;
+                }
+
+                return ret;
+            }
+
+            public static List<Card.Cards> GetPlayableMinionSequence(Board board, bool altogetherWithHammer = false)
+            {
+                var ret = new List<Card.Cards>();
+                var manaAvailable = altogetherWithHammer ? board.ManaAvailable - 5 : board.ManaAvailable;
+
+                foreach (var card in board.Hand.OrderByDescending(x => x.CurrentCost))
+                {
+                    if (card.Type != Card.CType.MINION) continue;
+                    if (manaAvailable < card.CurrentCost) continue;
+
+                    ret.Add(card.Template.Id);
+                    manaAvailable -= card.CurrentCost;
+                }
+
+                return ret;
+            }
+
+            public static int GetPlayableMinionSequenceDamages(List<Card.Cards> minions, Board board)
+            {
+                return GetPlayableMinionSequenceAttacker(minions, board).Sum(x => CardTemplate.LoadFromId(x).Atk);
+            }
+
+            public static List<Card.Cards> GetPlayableMinionSequenceAttacker(List<Card.Cards> minions, Board board)
+            {
+                var minionscopy = minions.ToArray().ToList();
+                foreach (var mi in board.MinionEnemy.OrderByDescending(x => x.CurrentAtk))
+                {
+                    if (
+                        minions.OrderByDescending(x => CardTemplate.LoadFromId(x).Atk)
+                            .Any(x => CardTemplate.LoadFromId(x).Health <= mi.CurrentAtk))
+                    {
+                        var tar =
+                            minions.OrderByDescending(x => CardTemplate.LoadFromId(x).Atk)
+                                .FirstOrDefault(x => CardTemplate.LoadFromId(x).Health <= mi.CurrentAtk);
+                        minionscopy.Remove(tar);
+                    }
+                }
+
+                return minionscopy;
+            }
+
+            public static int GetPotentialMinionDamages(Board board)
+            {
+                return GetPotentialMinionAttacker(board).Sum(x => x.CurrentAtk);
+            }
+
+            public static List<Card> GetPotentialMinionAttacker(Board board)
+            {
+                var minionscopy = board.MinionFriend.ToArray().ToList();
+                foreach (var mi in board.MinionEnemy.OrderByDescending(x => x.CurrentAtk))
+                {
+                    if (
+                        board.MinionFriend.OrderByDescending(x => x.CurrentAtk)
+                            .Any(x => x.CurrentHealth <= mi.CurrentAtk))
+                    {
+                        var tar =
+                            board.MinionFriend.OrderByDescending(x => x.CurrentAtk)
+                                .FirstOrDefault(x => x.CurrentHealth <= mi.CurrentAtk);
+                        minionscopy.Remove(tar);
+                    }
+                }
+
+                return minionscopy;
+            }
+
+            public static int GetPotentialFaceDamages(Board board)
+            {
+                return GetPotentialWeaponDamages(board) +
+                       GetPlayableSpellSequenceDamages(board, ShouldPlayDoomhammer(board));
+            }
+
+            public static int GetRemainingBlastDamagesAfterSequence(Board board)
+            {
+                return GetTotalBlastDamagesInHand(board) -
+                       GetPlayableSpellSequenceDamages(board, ShouldPlayDoomhammer(board));
+            }
+
+            public static int GetTotalBlastDamagesInHand(Board board)
+            {
+                return
+                    board.Hand.FindAll(x => _spellDamagesTable.ContainsKey(x.Template.Id))
+                        .Sum(x => _spellDamagesTable[x.Template.Id] + GetSpellPower(board));
+            }
+
+            public static int GetPotentialWeaponDamages(Board board)
+            {
+                if (HasDoomhammerOnBoard(board))
+                {
+                    return (2 + GetPlayableRockbiters(board)*3)*(2 - board.HeroFriend.CountAttack);
+                }
+
+                if (HasDommhammerInHand(board) && CanPlayDoomhammer(board))
+                {
+                    return (2 + GetPlayableRockbiters(board, true)*3)*(2 - board.HeroFriend.CountAttack);
+                }
+
+                return 0;
+            }
+
+            public static int GetPlayableRockbiters(Board board, bool altogetherWithHammer = false)
+            {
+                var handCount = board.Hand.Count(x => x.Template.Id == Cards.RockbiterWeapon);
+                var manaAvailable = altogetherWithHammer ? board.ManaAvailable - 5 : board.ManaAvailable;
+
+                if (manaAvailable < handCount)
+                {
+                    handCount = manaAvailable;
+                }
+
+                return handCount < 0 ? 0 : handCount;
+            }
+
+            public static bool HasDoomhammerOnBoard(Board board)
+            {
+                return board.WeaponFriend != null && board.WeaponFriend.Template.Id == Cards.Doomhammer;
+            }
+
+            public static bool HasDommhammerInHand(Board board)
+            {
+                return board.Hand.Any(x => x.Template.Id == Cards.Doomhammer);
+            }
+
+            public static bool CanPlayDoomhammer(Board board)
+            {
+                return board.ManaAvailable >= 5;
+            }
+
+            public static bool CanPlayDoomhammerNextTurn(Board board)
+            {
+                return board.ManaAvailable - board.LockedMana + 1 >= 5 && HasDommhammerInHand(board);
+            }
         }
     }
 }
